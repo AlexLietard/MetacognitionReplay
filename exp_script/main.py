@@ -25,7 +25,7 @@ TOTAL_BLOCKS = 8  # must be even: half with replay, half without
 NUMBER_OF_TRIALS = 20  # per block
 STIMULUS_DURATION = 0.25
 INTERTRIAL_PAUSE = 1  # fixation cross display time
-MENTAL_REPLAY_PAUSE = 1  # pause during mental replay instruction
+MENTAL_REPLAY_PAUSE = 1.5  # pause during mental replay instruction
 FEEDBACK_TIME = 0.5
 FIXATION_CROSS_DURATION = 0.5
 
@@ -190,7 +190,7 @@ header = [
 ]
 
 # Main trial procedure
-def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction, stim_strength, stim_duration,
+def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction, stim_strength, stim_duration, resp_duration_max,
               give_feedback=False, saved_block_label=None):
     if saved_block_label is None:
         saved_block_label = block_type
@@ -241,6 +241,7 @@ def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction
     reference = np.random.randint(0, 180)
     to_show = gabor.generate_gabor_patches(win, reference=reference,
                                            direction=gabor_direction, distance_to_bound=stim_strength)
+    correct_response = "v" if gabor_direction < 0 else "b"
     
     # Show the gabor patches as well as the arc for the answer
     for stim in to_show[0]:
@@ -250,17 +251,16 @@ def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction
     win.flip()
     check_for_escape()
     core.wait(stim_duration)
-
-    correct_response = "v" if gabor_direction < 0 else "b"
+    
     event.clearEvents()
 
     # Just show the arc for the answer
     for stim in to_show[1]:
         stim.draw()
     win.flip()
-    check_for_escape()
 
     rt_clock.reset()
+    
     while True:  # Wait for participant's response
         check_for_escape()
         key = event.getKeys(keyList=key_list, timeStamped=rt_clock)
@@ -269,6 +269,7 @@ def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction
             response = info_response[0]
             response_time = info_response[1]
             break
+    
     correct = correct_response == response
 
     if block_type == "with_mental_replay":
@@ -501,12 +502,13 @@ def exp_phase():
                 global_trial=global_trial_number,
                 gabor_direction=direction,
                 stim_strength=stim_strength,
-                stim_duration=STIMULUS_DURATION
+                stim_duration=STIMULUS_DURATION,
+                resp_duration_max = 0.6
             )
 
 
 
-training_phase()
+# training_phase()
 exp_phase()
 utils.show_images(win, image_end, min_display_time)
 win.close()
