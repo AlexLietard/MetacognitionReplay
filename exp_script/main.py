@@ -54,7 +54,7 @@ image_end = [os.path.join(image_dir, f) for f in ["End.JPG"]]
 image_replay = [os.path.join(image_dir, "MentalReplayImg.png")]
 replay_stim = visual.ImageStim(win, image=image_replay[0])
 
-min_display_time = 2  # seconds before intructions can be skipped
+min_display_time = 3  # seconds before intructions can be skipped
 
 # Escape function
 def check_for_escape():
