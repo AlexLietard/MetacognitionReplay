@@ -239,7 +239,7 @@ def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction
         stim.draw()
     win.flip()
 
-    utils.take_picture(win, "stim")
+    # utils.take_picture(win, "stim")
     check_for_escape()
     core.wait(stim_duration)
     
