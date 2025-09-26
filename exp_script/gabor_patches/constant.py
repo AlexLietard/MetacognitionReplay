@@ -6,3 +6,4 @@ class constant:
     GABOR_SIZE = 30
     NUMBER_TRIALS = 10
     NUMBER_BLOCKS = 2
+    SD = 9

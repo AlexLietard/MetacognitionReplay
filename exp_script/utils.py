@@ -61,3 +61,7 @@ def save_trial_data(filepath, header, data_row):
     except PermissionError:
         print(f"Unable to write to file {filepath}. Close the file if it's open.")
         core.quit()
+
+def take_picture(win, name):
+    win.getMovieFrame()
+    win.saveMovieFrames(f'./image_experiment/{name}.png')

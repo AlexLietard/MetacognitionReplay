@@ -22,12 +22,15 @@ key_list = ["v", "b"]
 # Experiment parameters
 N_TRAINING_TRIALS = 20  # number of training trials
 TOTAL_BLOCKS = 8  # must be even: half with replay, half without
-NUMBER_OF_TRIALS = 20  # per block
+TRIALS_PER_BLOCK = 20  # per block
 STIMULUS_DURATION = 0.25
 INTERTRIAL_PAUSE = 1  # fixation cross display time
 MENTAL_REPLAY_PAUSE = 1.5  # pause during mental replay instruction
 FEEDBACK_TIME = 0.5
 FIXATION_CROSS_DURATION = 0.5
+
+CONFIDENCE_DELAY_ESTIMATE = 1.5   # estimated replay duration (explanation: non-mental replay trials shorter than mental replay. This delay evens them out) 
+CONFIDENCE_JITTER_RANGE = 0.3     # ± jitter in seconds
 
 # Set relative paths
 phase = 0
@@ -48,13 +51,15 @@ image_training_end = [os.path.join(image_dir, f) for f in ["Training_end.JPG"]]
 
 image_task1 = [os.path.join(image_dir, f) for f in ["Task1_1.JPG"]] # mental replay screen
 image_task2 = [os.path.join(image_dir, f) for f in ["Task2_1.JPG"]] # non-mental replay screen
+
+image_break = [os.path.join(image_dir, "Break.jpg")]
 image_end = [os.path.join(image_dir, f) for f in ["End.JPG"]]
 
 # REPLAY IMAGE
 image_replay = [os.path.join(image_dir, "MentalReplayImg.png")]
 replay_stim = visual.ImageStim(win, image=image_replay[0])
 
-min_display_time = 3  # seconds before intructions can be skipped
+min_display_time = 2  # seconds before intructions can be skipped
 
 # Escape function
 def check_for_escape():
@@ -91,19 +96,16 @@ rt_clock = core.Clock()
 # handle numeric and non-numeric participant ids robustly
 try:
     participant_id_num = int(participant_id_clean)  # participant ID must be numeric for direct numeric mapping
-    group_id = participant_id_num % 8  # assign participant to 1 of 8 groups (0–7)
+    group_id = participant_id_num % 4  # assign participant to 1 of 8 groups (0–7)
 except ValueError:
     # fallback: use sum of ordinals (consistent with the seed)
-    group_id = sum(ord(c) for c in participant_id_clean) % 8
+    group_id = sum(ord(c) for c in participant_id_clean) % 4
 
 # Factor 1: starting condition
 start_with_replay = (group_id % 2 == 0)  # even groups: replay first, odd groups: non-replay first
 
-# Factor 2: scale order
-vividness_first = (group_id // 2) % 2 == 0  # groups 0–1,4–5 vividness first; groups 2–3,6–7 confidence first
-
-# Factor 3: hand assignment
-left_for_confidence = (group_id // 4) % 2 == 0  # groups 0–3: left hand = confidence; groups 4–7: left hand = vividness
+# Factor 2: hand assignment
+left_for_confidence = (group_id // 2) % 2 == 0  # groups 0–3: left hand = confidence; groups 4–7: left hand = vividness
 
 # Create block order
 half_blocks = TOTAL_BLOCKS // 2
@@ -116,7 +118,6 @@ test_directions = []
 
 print(f"Assigned to group {group_id}: "
       f"{'Replay first' if start_with_replay else 'Non-replay first'}, "
-      f"{'Vividness first' if vividness_first else 'Confidence first'}, "
       f"{'Left=confidence' if left_for_confidence else 'Left=vividness'}")
 
 # Save trial data to CSV
@@ -149,11 +150,7 @@ data_file = os.path.join(save_directory, f"{participant_id_clean}_{timestamp}_ex
 
 # Fixation cross
 fixation_cross = visual.TextStim(win, text="+", color='white', height=30)
-dot_instruction = visual.TextStim(
-    win, text="Which direction are most of the dots moving?\nPress V or B.",
-    color='white', height=20, pos=(0, -250), wrapWidth=700
-)
-replay_text = visual.TextStim(win, text="Mentally replay the motion you just saw.", color='white', height=20)
+circle_waiting = visual.Circle(win, radius=12, fillColor='white', lineColor='white', pos=(0, 0))
 
 # Response key mappings
 left_vividness_keys = {'a': 1, 'z': 2, 'e': 3, 'r': 4} # counterbalancing: the keys switch -- half the time vividness is on the left hand
@@ -190,46 +187,38 @@ header = [
 ]
 
 # Main trial procedure
-def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction, stim_strength, stim_duration, resp_duration_max,
+def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction, stim_strength, stim_duration,
               give_feedback=False, saved_block_label=None):
     if saved_block_label is None:
         saved_block_label = block_type
     response = None
 
     # Set rating key mappings
-    if block_type == "with_mental_replay":
-        vividness_on_left = not left_for_confidence
-        if left_for_confidence:
-            confidence_keys = left_confidence_keys
-            vividness_keys = right_vividness_keys
-            confidence_prompt_text = "How confident are you?\n\nUse A/Z/E/R (left hand)"
-            vividness_prompt_text = "How vivid was your mental replay?\n\nUse U/I/O/P (right hand)"
-        else:
-            confidence_keys = right_confidence_keys
-            vividness_keys = left_vividness_keys
-            confidence_prompt_text = "How confident are you?\n\nUse U/I/O/P (right hand)"
-            vividness_prompt_text = "How vivid was your mental replay?\n\nUse A/Z/E/R (left hand)"
-    else:  # without mental replay
-        vividness_on_left = None
+    vividness_on_left = not left_for_confidence
+    if left_for_confidence:
+        confidence_keys = left_confidence_keys
+        vividness_keys = right_vividness_keys
+        confidence_prompt_text = "How confident are you?\n\nUse A/Z/E/R (left hand)"
+        vividness_prompt_text = "How vivid was your mental replay?\n\nUse U/I/O/P (right hand)"
+    else:
         confidence_keys = right_confidence_keys
-        confidence_prompt_text = (
-            "How confident are you in your response?\n\n"
-            "U = Not confident   I = Slightly   O = Moderately   P = Very confident"
-        )
-        vividness_keys = None
-        vividness_prompt_text = None
+        vividness_keys = left_vividness_keys
+        confidence_prompt_text = "How confident are you?\n\nUse U/I/O/P (right hand)"
+        vividness_prompt_text = "How vivid was your mental replay?\n\nUse A/Z/E/R (left hand)"
+
 
     # Store prompts in proper order
-    prompts = []
-    if block_type == "with_mental_replay":
-        if vividness_first:
-            prompts = [("vividness", vividness_prompt_text, vividness_keys),
-                       ("confidence", confidence_prompt_text, confidence_keys)]
-        else:
-            prompts = [("confidence", confidence_prompt_text, confidence_keys),
-                       ("vividness", vividness_prompt_text, vividness_keys)]
-    elif block_type == "without_mental_replay":
+    prompts = [("confidence", confidence_prompt_text, confidence_keys),
+                ("vividness", vividness_prompt_text, vividness_keys)]
+    
+    # Have the training progressively by including more prompts
+    if "training" in saved_block_label and int(saved_block_label.split("_")[1]) == 1:
+        prompts = []
+    elif "training" in saved_block_label and int(saved_block_label.split("_")[1]) == 2:
         prompts = [("confidence", confidence_prompt_text, confidence_keys)]
+    elif "training" in saved_block_label and int(saved_block_label.split("_")[1]) == 3:
+        prompts = [("confidence", confidence_prompt_text, confidence_keys),
+            ("vividness", vividness_prompt_text, vividness_keys)]
 
     # Fixation cross
     fixation_cross.draw()
@@ -249,6 +238,8 @@ def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction
     for stim in to_show[1]:
         stim.draw()
     win.flip()
+
+    utils.take_picture(win, "stim")
     check_for_escape()
     core.wait(stim_duration)
     
@@ -260,7 +251,7 @@ def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction
     win.flip()
 
     rt_clock.reset()
-    
+
     while True:  # Wait for participant's response
         check_for_escape()
         key = event.getKeys(keyList=key_list, timeStamped=rt_clock)
@@ -269,7 +260,7 @@ def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction
             response = info_response[0]
             response_time = info_response[1]
             break
-    
+
     correct = correct_response == response
 
     if block_type == "with_mental_replay":
@@ -277,8 +268,13 @@ def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction
         replay_stim.draw()
         win.flip()
         check_for_escape()
-        core.wait(MENTAL_REPLAY_PAUSE)  # 1 second
-        
+        core.wait(MENTAL_REPLAY_PAUSE)  # fixed pause (e.g. 1s)
+
+    elif block_type == "without_mental_replay":
+        circle_waiting.draw()
+        win.flip()
+        # Insert matched delay + jitter so timing aligns with replay trials
+        core.wait(MENTAL_REPLAY_PAUSE)
 
     # Ratings loop
     ratings = {"vividness": "NA", "confidence": "NA"}
@@ -336,7 +332,6 @@ def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction
 
     return correct
 
-
 # TRAINING PHASE (Adaptive & Varying Duration)
 def training_phase():
     utils.show_images(win, image_intro, min_display_time)
@@ -363,7 +358,7 @@ def training_phase():
             stim_strength=max(20-trial_counter, 10),
             give_feedback=True,
             saved_block_label="training_1",
-            stim_duration = 1.0
+            stim_duration = 1.0,
         )
         correct_history.append(correct)
         trial_counter += 1
@@ -437,23 +432,19 @@ def training_phase():
 # EXPERIMENTAL PHASE (Adaptive staircase)
 def exp_phase():
     # Loop through blocks
-    stim_strength = 8  # initial coherence/distance value
+    stim_strength = 10  # initial coherence/distance value
     for block_idx, condition in enumerate(block_order):
 
         # Break halfway
         if block_idx == TOTAL_BLOCKS // 2:
             break_clock = core.Clock()
-            break_text = visual.TextStim(
-                win,
-                text="You can take a short break now.\n\nPress any key when ready to continue.",
-                color="white", height=30, wrapWidth=800
-            )
+            
+            # Show break image
+            utils.show_images(win, image_break, min_display_time)
             event.clearEvents()
-            break_text.draw()
-            win.flip()
-            event.waitKeys()  # wait for keypress
+            event.waitKeys()
             break_duration = break_clock.getTime()
-
+            
             # Save break info in CSV
             row_dict = {
                 "participant_id": participant_id,
@@ -469,7 +460,7 @@ def exp_phase():
                 "reference": "NA",
                 "vividness": "NA",
                 "confidence": "NA",
-                "response_time": break_duration,
+                "response_time": break_duration,  # <-- actual time spent
                 "gabor_direction": "NA",
                 "correct": "NA",
                 "stim_strength": "NA",
@@ -484,16 +475,17 @@ def exp_phase():
             utils.show_images(win, image_task1, min_display_time)  # replay
 
         # Run all trials in block
-        for trial in range(NUMBER_OF_TRIALS):
+        for trial in range(TRIALS_PER_BLOCK):
             win.flip()
             core.wait(INTERTRIAL_PAUSE)
 
             # Get next direction (pseudo-randomized to avoid streaks)
             direction = utils.get_pseudorandom_direction(prev_directions=test_directions)
+            print(direction)
             test_directions.append(direction)
 
             block_number = block_idx + 1
-            global_trial_number = block_idx * NUMBER_OF_TRIALS + trial + 1
+            global_trial_number = block_idx * TRIALS_PER_BLOCK + trial + 1
 
             run_trial(
                 block_type=condition,
@@ -503,10 +495,7 @@ def exp_phase():
                 gabor_direction=direction,
                 stim_strength=stim_strength,
                 stim_duration=STIMULUS_DURATION,
-                resp_duration_max = 0.6
             )
-
-
 
 # training_phase()
 exp_phase()

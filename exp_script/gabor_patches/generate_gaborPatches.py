@@ -50,7 +50,7 @@ def generate_gabor_patches(win, reference, direction, distance_to_bound):
     # Store things to show in a list
     to_show_arc = [arc_left, arc_left_sym, arc_right, arc_right_sym]
     
-    orientations = utils.generate_orientation_patches(ct.NUM_PATCHES, reference+distance_to_bound*direction, sd=5)
+    orientations = utils.generate_orientation_patches(ct.NUM_PATCHES, reference+distance_to_bound*direction, sd=ct.SD)
     positions = utils.generate_position_patches(ct.NUM_PATCHES, ct.DIAGONAL_TO_CENTER, ct.DISTANCE_MIN_BETW_GABORS)
     
     # Also for the gabor patches
