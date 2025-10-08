@@ -22,9 +22,9 @@ key_list = ["v", "b"]
 # Experiment parameters
 N_TRAINING_TRIALS = 20  # number of training trials
 TOTAL_BLOCKS = 8  # must be even: half with replay, half without
-TRIALS_PER_BLOCK = 20  # per block
+TRIALS_PER_BLOCK = 50  # per block
 STIMULUS_DURATION = 0.25
-INTERTRIAL_PAUSE = 1  # fixation cross display time
+INTERTRIAL_PAUSE = 0.5  # fixation cross display time
 MENTAL_REPLAY_PAUSE = 1.5  # pause during mental replay instruction
 FEEDBACK_TIME = 0.5
 FIXATION_CROSS_DURATION = 0.5
@@ -565,7 +565,6 @@ def exp_phase():
 
             # Get next direction (pseudo-randomized to avoid streaks)
             direction = utils.get_pseudorandom_direction(prev_directions=test_directions)
-            print(direction)
             test_directions.append(direction)
 
             block_number = block_idx + 1
@@ -581,7 +580,7 @@ def exp_phase():
                 stim_duration=STIMULUS_DURATION,
             )
 
-training_phase()
+# training_phsase()
 if left_for_confidence: # show experiment instructions adapted to handedness
     utils.show_images(win, image_exp_instructions_left, min_display_time)
 else:
