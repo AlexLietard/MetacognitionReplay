@@ -48,8 +48,7 @@ image_training3 = [os.path.join(image_dir, f) for f in ["Training3_1.jpg", "Trai
 image_training4 = [os.path.join(image_dir, f) for f in ["Training4_1.jpg", "Training4_2.jpg"]]
 image_training_end = [os.path.join(image_dir, f) for f in ["Training_end.jpg"]]
 
-image_exp_instructions_right = [os.path.join(image_dir, f) for f in ["Experiment1.jpg", "Experiment2.jpg", "Experiment3R.jpg", "Experiment4.jpg"]]
-image_exp_instructions_left  = [os.path.join(image_dir, f) for f in ["Experiment1.jpg", "Experiment2.jpg", "Experiment3L.jpg", "Experiment4.jpg"]]
+image_exp_instructions  = [os.path.join(image_dir, f) for f in ["Experiment1.jpg"]]
 
 image_exp_replay = [os.path.join(image_dir, f) for f in ["Replay_Reminder.jpg"]] # reminders set before every experiment block
 image_exp_non_replay = [os.path.join(image_dir, f) for f in ["NoReplay_Reminder.jpg"]]
@@ -160,21 +159,33 @@ response_keys = ['v', 'b', 'escape']
 # Create visual scales for both conditions
 def draw_visual_scale(win, selected, labels, y_offset=-100):
     spacing = 150
-    start_x = -((len(labels) - 1) * spacing) / 2
     rect_size = 50
+    start_x = -((len(labels) - 1) * spacing) / 2
 
-    for i, label in enumerate(labels):
+    # Draw all squares first
+    for i, _ in enumerate(labels):
         x = start_x + i * spacing
-        # Draw square
         color = 'blue' if selected == (i + 1) else None
-        square = visual.Rect(win, width=rect_size, height=rect_size,
-                             lineColor='white', fillColor=color, pos=(x, y_offset))
+        square = visual.Rect(
+            win, width=rect_size, height=rect_size,
+            lineColor='white', fillColor=color, pos=(x, y_offset)
+        )
         square.draw()
 
-        # Draw label below the square
-        text = visual.TextStim(win, text=label, pos=(x, y_offset - 40),
-                               height=16, color='white', wrapWidth=200)
-        text.draw()
+    # Draw all labels on top of the squares
+    for i, label in enumerate(labels):
+        x = start_x + i * spacing
+        text_stim = visual.TextStim(
+            win,
+            text=label,
+            pos=(x, y_offset - 50),   # adjust vertical spacing as needed
+            height=20,                # larger font
+            color='white',
+            colorSpace='rgb',
+            wrapWidth=200
+        )
+        text_stim.draw()
+
 
 # Arrow stimuli for mental replay vs non-replay
 def make_arrow(win, pos, angle): # create an arrow stimulus at position 'pos' rotated by 'angle' degrees
@@ -220,12 +231,12 @@ def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction
         confidence_keys = left_confidence_keys
         vividness_keys = right_vividness_keys
         confidence_prompt_text = "How confident are you?\n\nUse A/Z/E/R (left hand)"
-        vividness_prompt_text = "How vivid was your mental replay?\n\nUse U/I/O/P (right hand)"
+        vividness_prompt_text = "When the arrows were displayed, to what extent did you mentally 'see' the lines again?\n\nUse U/I/O/P (right hand)"
     else:
         confidence_keys = right_confidence_keys
         vividness_keys = left_vividness_keys
         confidence_prompt_text = "How confident are you?\n\nUse U/I/O/P (right hand)"
-        vividness_prompt_text = "How vivid was your mental replay?\n\nUse A/Z/E/R (left hand)"
+        vividness_prompt_text = "When the arrows were displayed, to what extent did you mentally 'see' the lines again?\n\nUse A/Z/E/R (left hand)"
 
 
     # Store prompts in proper order
@@ -304,24 +315,62 @@ def run_trial(block_type, block_number, trial_num, global_trial, gabor_direction
     # Ratings loop
     ratings = {"vividness": "NA", "confidence": "NA"}
     for measure, prompt_text, keymap in prompts:
-        prompt = visual.TextStim(win, text=prompt_text, color='white', height=20, wrapWidth=700)
         rating = None
         event.clearEvents()
+        
+        # Labels for the scale
         labels = ["Not vivid", "Slightly", "Moderately", "Very vivid"] if measure == "vividness" \
                     else ["Not confident", "Slightly", "Moderately", "Very confident"]
+        
+        # Create prompt text once
+        prompt = visual.TextStim(win, text=prompt_text, color='white', height=24, wrapWidth=700)
+        
         while rating is None:
             check_for_escape()
             keys = event.getKeys()
             for key in keys:
                 if key in keymap:
                     rating = keymap[key]
-            # Draw prompt and highlight the current rating dynamically
+            
+            # Draw prompt
             prompt.draw()
-            utils.draw_visual_scale(win, selected=rating, labels=labels, y_offset=-200) # pass current rating to highlight
+            
+            # Draw scale squares and labels
+            spacing = 150
+            start_x = -((len(labels) - 1) * spacing) / 2
+            rect_size = 50
+            
+            for i, label in enumerate(labels):
+                x = start_x + i * spacing
+                # Highlight square if selected
+                square_color = 'blue' if rating == (i + 1) else None
+                square = visual.Rect(
+                    win,
+                    width=rect_size,
+                    height=rect_size,
+                    lineColor='white',
+                    fillColor=square_color,
+                    pos=(x, -200)
+                )
+                square.draw()
+                
+                # Draw text label underneath (always white)
+                text_stim = visual.TextStim(
+                    win,
+                    text=label,
+                    pos=(x, -200 - 50),
+                    height=20,
+                    color='white',
+                    colorSpace='rgb',
+                    wrapWidth=200
+                )
+                text_stim.draw()
+            
             win.flip()
+        
         core.wait(0.5)
-
         ratings[measure] = rating
+
 
     # Feedback
     if give_feedback:
@@ -454,8 +503,6 @@ def training_phase():
             recent_accuracy = sum(correct_history[-baseline_trials:]) / baseline_trials
             if recent_accuracy >= accuracy_threshold or trial_counter >= baseline_trials + max_extra_trials:
                 break
-
-    utils.show_images(win, image_training_end, min_display_time)
         
     # 4: non-mental replay practice (new phase)
     utils.show_images(win, image_training4, min_display_time)
@@ -580,11 +627,8 @@ def exp_phase():
                 stim_duration=STIMULUS_DURATION,
             )
 
-# training_phsase()
-if left_for_confidence: # show experiment instructions adapted to handedness
-    utils.show_images(win, image_exp_instructions_left, min_display_time)
-else:
-    utils.show_images(win, image_exp_instructions_right, min_display_time)
+training_phase()
+utils.show_images(win, image_exp_instructions, min_display_time)
 exp_phase()
 utils.show_images(win, image_end, min_display_time)
 win.close()
